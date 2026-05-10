@@ -13,30 +13,26 @@ if [ "$TARGET_LIBC" == "musl" ]; then
   exit 1
 fi
 
-OPENVINO_VERSION=${OPENVINO_VERSION:-2025.4.0}
+OPENVINO_VERSION=${OPENVINO_VERSION:-2025.4.0.0}
 INSTALL_DIR=/opt/intel/openvino
 
-# Map architecture to Intel naming
- case "$TARGET_ARCH" in
-   x86_64)
-     INTEL_ARCH="x86_64"
-     ;;
-   aarch64)
-     INTEL_ARCH="arm64"
-     ;;
-   *)
-     echo "Unsupported architecture for OpenVINO: $TARGET_ARCH"
-     exit 1
-     ;;
- esac
+case "$TARGET_ARCH" in
+  x86_64)
+    ARCHIVE="openvino_genai_ubuntu24_${OPENVINO_VERSION}_x86_64.tar.gz"
+    ;;
+  aarch64)
+    ARCHIVE="openvino_genai_ubuntu20_${OPENVINO_VERSION}_arm64.tar.gz"
+    ;;
+  *)
+    echo "Unsupported architecture for OpenVINO: $TARGET_ARCH"
+    exit 1
+    ;;
+esac
 
-# Download and extract OpenVINO runtime
-# Using the generic runtime archive
-ARCHIVE="l_openvino_toolkit_ubuntu24_${OPENVINO_VERSION}_${INTEL_ARCH}.tgz"
-URL="https://storage.openvinotoolkit.org/repositories/openvino/packages/${OPENVINO_VERSION%.*}/linux/${ARCHIVE}"
+URL="https://storage.openvinotoolkit.org/repositories/openvino_genai/packages/${OPENVINO_VERSION%.*.*}/linux/${ARCHIVE}"
 
 cd /tmp
-wget -q "$URL" -O "$ARCHIVE" || {
+curl -L --fail "$URL" -o "$ARCHIVE" || {
   echo "Failed to download OpenVINO from $URL"
   exit 1
 }
@@ -46,12 +42,14 @@ tar -xzf "$ARCHIVE" -C "$INSTALL_DIR" --strip-components=1
 rm -f "$ARCHIVE"
 
 # Source environment
-source "$INSTALL_DIR/setupvars.sh"
+if [ -f "$INSTALL_DIR/setupvars.sh" ]; then
+  source "$INSTALL_DIR/setupvars.sh"
+fi
 
 # Persist to GITHUB_ENV if available
 ENV_FILE=${GITHUB_ENV:-.env}
 cat >>"$ENV_FILE" <<END
 OpenVINO_DIR=$INSTALL_DIR/runtime/cmake
-LD_LIBRARY_PATH=$INSTALL_DIR/runtime/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
-PATH=$INSTALL_DIR/runtime/bin${PATH:+:$PATH}
+LD_LIBRARY_PATH=$INSTALL_DIR/runtime/lib/intel64:$INSTALL_DIR/runtime/lib/aarch64:${LD_LIBRARY_PATH:-}
+PATH=$INSTALL_DIR/runtime/bin/intel64:$INSTALL_DIR/runtime/bin/aarch64:${PATH:-}
 END

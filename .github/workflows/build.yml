@@ -47,6 +47,10 @@ jobs:
       ONNXRUNTIME_TARGET_LIBC: ${{ inputs.target_libc }}
       ONNXRUNTIME_IS_DEBUG: ${{ inputs.is_debug }}
     steps:
+      - name: Bootstrap container
+        if: inputs.target_libc == 'musl'
+        run: apk add --no-cache bash git
+        shell: sh
       - name: Initialize
         id: init
         shell: bash
