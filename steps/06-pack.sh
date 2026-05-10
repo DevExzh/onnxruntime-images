@@ -1,0 +1,7 @@
+#!/bin/bash -eux
+
+STAGING_DIR=${ONNXRUNTIME_STAGING_DIR:-$PWD/staging}
+ARTIFACT_NAME=${ONNXRUNTIME_ARTIFACT_NAME:-onnxruntime}
+
+cd "$STAGING_DIR"
+tar czf "../$ARTIFACT_NAME.tgz" .

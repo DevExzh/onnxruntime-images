@@ -1,0 +1,88 @@
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: ONNX Runtime version
+        type: string
+        required: false
+        default: v1.21.0
+      ep:
+        description: Execution provider
+        type: string
+        required: true
+      target_arch:
+        description: Target architecture
+        type: string
+        required: true
+      target_libc:
+        description: Target C library
+        type: string
+        required: true
+      is_debug:
+        description: Debug build
+        type: boolean
+        required: false
+        default: false
+    outputs:
+      artifact:
+        description: "The name of the artifact"
+        value: ${{ jobs.build.outputs.artifact }}
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build:
+    outputs:
+      artifact: ${{ steps.init.outputs.artifact }}
+    runs-on: ${{ inputs.target_arch == 'x86_64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
+    container: ${{ inputs.target_libc == 'glibc' && 'debian:trixie-slim' || 'alpine:latest' }}
+    env:
+      ONNXRUNTIME_VERSION: ${{ inputs.version }}
+      ONNXRUNTIME_EP: ${{ inputs.ep }}
+      ONNXRUNTIME_TARGET_ARCH: ${{ inputs.target_arch }}
+      ONNXRUNTIME_TARGET_LIBC: ${{ inputs.target_libc }}
+      ONNXRUNTIME_IS_DEBUG: ${{ inputs.is_debug }}
+    steps:
+      - name: Initialize
+        id: init
+        shell: bash
+        run: |
+          ARTIFACT="onnxruntime-${{ inputs.ep }}-${{ inputs.target_libc }}-${{ inputs.target_arch }}"
+          [ "${{ inputs.is_debug }}" == "true" ] && ARTIFACT="$ARTIFACT-debug"
+          echo "artifact=$ARTIFACT" >> "$GITHUB_OUTPUT"
+          echo "ONNXRUNTIME_ARTIFACT_NAME=$ARTIFACT" >> "$GITHUB_ENV"
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+      - name: Set environment variables
+        run: steps/00-environment.sh
+        shell: bash
+      - name: Install dependencies
+        run: steps/01-install.sh
+        shell: bash
+      - name: Install OpenVINO
+        if: inputs.ep == 'openvino'
+        run: steps/03-install-openvino.sh
+        shell: bash
+      - name: Checkout ONNX Runtime
+        run: steps/02-checkout.sh
+        shell: bash
+        timeout-minutes: 15
+      - name: Build
+        run: steps/04-build.sh
+        shell: bash
+        timeout-minutes: 180
+      - name: Stage
+        run: steps/05-stage.sh
+        shell: bash
+      - name: Pack
+        run: steps/06-pack.sh
+        shell: bash
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.init.outputs.artifact }}
+          path: "*.tgz"

@@ -1,0 +1,51 @@
+name: Build one
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: ONNX Runtime version
+        required: false
+        default: v1.21.0
+      ep:
+        description: Execution provider
+        type: choice
+        options:
+          - cpu
+          - openvino
+          - xnnpack
+        required: true
+      target_arch:
+        description: Target architecture
+        type: choice
+        options:
+          - x86_64
+          - aarch64
+        required: true
+      target_libc:
+        description: Target C library
+        type: choice
+        options:
+          - glibc
+          - musl
+        required: true
+      is_debug:
+        description: Debug build
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ github.event.inputs.version }}
+      ep: ${{ github.event.inputs.ep }}
+      target_arch: ${{ github.event.inputs.target_arch }}
+      target_libc: ${{ github.event.inputs.target_libc }}
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}

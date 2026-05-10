@@ -1,0 +1,16 @@
+# Dependencies
+3rdparty/
+
+# Build outputs
+build/
+staging/
+*.tgz
+*.tar.gz
+
+# Environment files
+.env
+.path
+
+# IDE
+.vscode/
+.idea/

@@ -1,0 +1,282 @@
+name: Build all
+
+permissions:
+  contents: read
+  packages: write
+  actions: write
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: ONNX Runtime version
+        required: false
+        default: ''
+      is_debug:
+        description: Debug build
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.vars.outputs.version }}
+      should_publish: ${{ steps.vars.outputs.should_publish }}
+    steps:
+      - name: Determine version and publish mode
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" == "push" ]; then
+            VERSION="${GITHUB_REF_NAME}"
+            SHOULD_PUBLISH="true"
+          elif [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            SHOULD_PUBLISH="true"
+          else
+            VERSION="dev"
+            SHOULD_PUBLISH="false"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "should_publish=$SHOULD_PUBLISH" >> "$GITHUB_OUTPUT"
+
+  # CPU EP builds
+  linux_cpu_x86_64_glibc:
+    name: Linux CPU x86_64 glibc
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ep: cpu
+      target_arch: x86_64
+      target_libc: glibc
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+
+  linux_cpu_aarch64_glibc:
+    name: Linux CPU aarch64 glibc
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ep: cpu
+      target_arch: aarch64
+      target_libc: glibc
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+
+  linux_cpu_x86_64_musl:
+    name: Linux CPU x86_64 musl
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ep: cpu
+      target_arch: x86_64
+      target_libc: musl
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+
+  linux_cpu_aarch64_musl:
+    name: Linux CPU aarch64 musl
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ep: cpu
+      target_arch: aarch64
+      target_libc: musl
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+
+  # XNNPACK EP builds
+  linux_xnnpack_x86_64_glibc:
+    name: Linux XNNPACK x86_64 glibc
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ep: xnnpack
+      target_arch: x86_64
+      target_libc: glibc
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+
+  linux_xnnpack_aarch64_glibc:
+    name: Linux XNNPACK aarch64 glibc
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ep: xnnpack
+      target_arch: aarch64
+      target_libc: glibc
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+
+  linux_xnnpack_x86_64_musl:
+    name: Linux XNNPACK x86_64 musl
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ep: xnnpack
+      target_arch: x86_64
+      target_libc: musl
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+
+  linux_xnnpack_aarch64_musl:
+    name: Linux XNNPACK aarch64 musl
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ep: xnnpack
+      target_arch: aarch64
+      target_libc: musl
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+
+  # OpenVINO EP builds (glibc only)
+  linux_openvino_x86_64_glibc:
+    name: Linux OpenVINO x86_64 glibc
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ep: openvino
+      target_arch: x86_64
+      target_libc: glibc
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+
+  linux_openvino_aarch64_glibc:
+    name: Linux OpenVINO aarch64 glibc
+    needs: prepare
+    uses: ./.github/workflows/build.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      ep: openvino
+      target_arch: aarch64
+      target_libc: glibc
+      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
+
+  release:
+    name: Publish Release
+    needs:
+      - prepare
+      - linux_cpu_x86_64_glibc
+      - linux_cpu_aarch64_glibc
+      - linux_cpu_x86_64_musl
+      - linux_cpu_aarch64_musl
+      - linux_xnnpack_x86_64_glibc
+      - linux_xnnpack_aarch64_glibc
+      - linux_xnnpack_x86_64_musl
+      - linux_xnnpack_aarch64_musl
+      - linux_openvino_x86_64_glibc
+      - linux_openvino_aarch64_glibc
+    if: needs.prepare.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
+      - name: Collect artifacts
+        run: |
+          for DIR in onnxruntime-*; do
+            [ -d "$DIR" ] || continue
+            echo "::group::$DIR"
+            mv "$DIR"/*.tgz . 2>/dev/null || true
+            echo "::endgroup::"
+          done
+      - name: Generate checksums
+        id: hash
+        run: echo "hashes=$(sha256sum onnxruntime-*.tgz | base64 -w0)" >> "$GITHUB_OUTPUT"
+      - name: Attest provenance
+        id: provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: onnxruntime-*.tgz
+      - name: Rename attestation
+        run: mv "${{ steps.provenance.outputs.bundle-path }}" onnxruntime-attestation.json 2>/dev/null || true
+      - name: Publish Release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: ONNX Runtime ${{ needs.prepare.outputs.version }}
+          tag: ${{ needs.prepare.outputs.version }}
+          artifacts: onnxruntime-*.tgz,onnxruntime-attestation.json
+
+  docker:
+    name: Docker ${{ matrix.ep }} ${{ matrix.arch }} ${{ matrix.libc }}
+    needs:
+      - prepare
+      - linux_cpu_x86_64_glibc
+      - linux_cpu_aarch64_glibc
+      - linux_cpu_x86_64_musl
+      - linux_cpu_aarch64_musl
+      - linux_xnnpack_x86_64_glibc
+      - linux_xnnpack_aarch64_glibc
+      - linux_xnnpack_x86_64_musl
+      - linux_xnnpack_aarch64_musl
+      - linux_openvino_x86_64_glibc
+      - linux_openvino_aarch64_glibc
+    if: needs.prepare.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { ep: cpu, arch: x86_64, libc: glibc, base: debian:trixie-slim, platform: linux/amd64 }
+          - { ep: cpu, arch: aarch64, libc: glibc, base: debian:trixie-slim, platform: linux/arm64 }
+          - { ep: cpu, arch: x86_64, libc: musl, base: alpine:latest, platform: linux/amd64 }
+          - { ep: cpu, arch: aarch64, libc: musl, base: alpine:latest, platform: linux/arm64 }
+          - { ep: xnnpack, arch: x86_64, libc: glibc, base: debian:trixie-slim, platform: linux/amd64 }
+          - { ep: xnnpack, arch: aarch64, libc: glibc, base: debian:trixie-slim, platform: linux/arm64 }
+          - { ep: xnnpack, arch: x86_64, libc: musl, base: alpine:latest, platform: linux/amd64 }
+          - { ep: xnnpack, arch: aarch64, libc: musl, base: alpine:latest, platform: linux/arm64 }
+          - { ep: openvino, arch: x86_64, libc: glibc, base: debian:trixie-slim, platform: linux/amd64 }
+          - { ep: openvino, arch: aarch64, libc: glibc, base: debian:trixie-slim, platform: linux/arm64 }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: onnxruntime-${{ matrix.ep }}-${{ matrix.libc }}-${{ matrix.arch }}
+          path: ./docker-context
+      - name: Extract artifact
+        run: |
+          cd docker-context
+          tar xzf *.tgz
+          rm -f *.tgz
+          ls -la
+      - name: Copy Dockerfile
+        run: cp docker/Dockerfile docker-context/
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: docker-context
+          platforms: ${{ matrix.platform }}
+          push: true
+          build-args: |
+            BASE_IMAGE=${{ matrix.base }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ needs.prepare.outputs.version }}-${{ matrix.ep }}-${{ matrix.libc }}-${{ matrix.arch }}
+            ghcr.io/${{ github.repository }}:latest-${{ matrix.ep }}-${{ matrix.libc }}-${{ matrix.arch }}
