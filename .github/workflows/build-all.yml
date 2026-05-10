@@ -147,17 +147,6 @@ jobs:
       target_libc: glibc
       is_debug: ${{ github.event.inputs.is_debug == 'true' }}
 
-  linux_openvino_aarch64_glibc:
-    name: Linux OpenVINO aarch64 glibc
-    needs: prepare
-    uses: ./.github/workflows/build.yml
-    with:
-      version: ${{ needs.prepare.outputs.version }}
-      ep: openvino
-      target_arch: aarch64
-      target_libc: glibc
-      is_debug: ${{ github.event.inputs.is_debug == 'true' }}
-
   release:
     name: Publish Release
     needs:
@@ -171,7 +160,6 @@ jobs:
       - linux_xnnpack_x86_64_musl
       - linux_xnnpack_aarch64_musl
       - linux_openvino_x86_64_glibc
-      - linux_openvino_aarch64_glibc
     if: needs.prepare.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -221,7 +209,6 @@ jobs:
       - linux_xnnpack_x86_64_musl
       - linux_xnnpack_aarch64_musl
       - linux_openvino_x86_64_glibc
-      - linux_openvino_aarch64_glibc
     if: needs.prepare.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -242,7 +229,6 @@ jobs:
           - { ep: xnnpack, arch: x86_64, libc: musl, base: alpine:latest, platform: linux/amd64 }
           - { ep: xnnpack, arch: aarch64, libc: musl, base: alpine:latest, platform: linux/arm64 }
           - { ep: openvino, arch: x86_64, libc: glibc, base: debian:trixie-slim, platform: linux/amd64 }
-          - { ep: openvino, arch: aarch64, libc: glibc, base: debian:trixie-slim, platform: linux/arm64 }
     steps:
       - name: Checkout
         uses: actions/checkout@v6

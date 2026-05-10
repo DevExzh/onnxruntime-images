@@ -20,16 +20,14 @@ BUILD_ARGS=(
   --allow_running_as_root
 )
 
-# Architecture flags for cross-compilation (not needed for native builds)
-# GitHub ARM runners are native ARM64, so no --arm64 flag needed
-
 case "$EP" in
   cpu)
     ;;
   openvino)
     # Source OpenVINO environment if available
     if [ -f /opt/intel/openvino/setupvars.sh ]; then
-      source /opt/intel/openvino/setupvars.sh
+      # shellcheck disable=SC1091
+      source /opt/intel/openvino/setupvars.sh || true
     fi
     BUILD_ARGS+=(--use_openvino CPU)
     ;;
@@ -42,4 +40,18 @@ case "$EP" in
     ;;
 esac
 
-./build.sh "${BUILD_ARGS[@]}"
+# Retry build up to 3 times to mitigate transient network failures
+for i in 1 2 3; do
+  echo "Build attempt $i..."
+  if ./build.sh "${BUILD_ARGS[@]}"; then
+    echo "Build succeeded on attempt $i"
+    exit 0
+  fi
+  if [ "$i" -lt 3 ]; then
+    echo "Build attempt $i failed, waiting 30s before retry..."
+    sleep 30
+  fi
+done
+
+echo "Build failed after 3 attempts"
+exit 1

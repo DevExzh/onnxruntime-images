@@ -19,9 +19,7 @@ INSTALL_DIR=/opt/intel/openvino
 case "$TARGET_ARCH" in
   x86_64)
     ARCHIVE="openvino_genai_ubuntu24_${OPENVINO_VERSION}_x86_64.tar.gz"
-    ;;
-  aarch64)
-    ARCHIVE="openvino_genai_ubuntu20_${OPENVINO_VERSION}_arm64.tar.gz"
+    LIB_DIR="intel64"
     ;;
   *)
     echo "Unsupported architecture for OpenVINO: $TARGET_ARCH"
@@ -41,15 +39,11 @@ mkdir -p "$INSTALL_DIR"
 tar -xzf "$ARCHIVE" -C "$INSTALL_DIR" --strip-components=1
 rm -f "$ARCHIVE"
 
-# Source environment
-if [ -f "$INSTALL_DIR/setupvars.sh" ]; then
-  source "$INSTALL_DIR/setupvars.sh"
-fi
-
-# Persist to GITHUB_ENV if available
+# Set environment manually instead of sourcing setupvars.sh
+# (setupvars.sh has an unbound variable bug on some distributions)
 ENV_FILE=${GITHUB_ENV:-.env}
 cat >>"$ENV_FILE" <<END
 OpenVINO_DIR=$INSTALL_DIR/runtime/cmake
-LD_LIBRARY_PATH=$INSTALL_DIR/runtime/lib/intel64:$INSTALL_DIR/runtime/lib/aarch64:${LD_LIBRARY_PATH:-}
-PATH=$INSTALL_DIR/runtime/bin/intel64:$INSTALL_DIR/runtime/bin/aarch64:${PATH:-}
+LD_LIBRARY_PATH=$INSTALL_DIR/runtime/lib/$LIB_DIR:$INSTALL_DIR/runtime/3rdparty/tbb/lib:${LD_LIBRARY_PATH:-}
+PATH=$INSTALL_DIR/runtime/bin/$LIB_DIR:${PATH:-}
 END

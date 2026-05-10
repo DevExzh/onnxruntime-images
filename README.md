@@ -8,9 +8,9 @@ Pre-built ONNX Runtime shared libraries for Linux, compiled on GitHub Actions wi
 |---|---|---|---|---|
 | CPU | ✅ | ✅ | ✅ | ✅ |
 | XNNPACK | ✅ | ✅ | ✅ | ✅ |
-| OpenVINO | ✅ | ✅ | ❌ | ❌ |
+| OpenVINO | ✅ | ❌ | ❌ | ❌ |
 
-*OpenVINO is only built for glibc-based targets because Intel does not provide official musl builds.*
+*OpenVINO is only built for x86_64 glibc because Intel does not provide official ARM64 Linux or musl builds.*
 
 ## GitHub Actions Workflows
 
