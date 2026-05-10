@@ -24,11 +24,6 @@ case "$EP" in
   cpu)
     ;;
   openvino)
-    # Source OpenVINO environment if available
-    if [ -f /opt/intel/openvino/setupvars.sh ]; then
-      # shellcheck disable=SC1091
-      source /opt/intel/openvino/setupvars.sh || true
-    fi
     BUILD_ARGS+=(--use_openvino CPU)
     ;;
   xnnpack)
