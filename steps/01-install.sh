@@ -30,6 +30,7 @@ install_debian() {
 install_alpine() {
   apk add --no-cache \
     build-base \
+    ca-certificates \
     cmake \
     git \
     python3 \

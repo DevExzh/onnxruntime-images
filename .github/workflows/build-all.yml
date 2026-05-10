@@ -180,7 +180,7 @@ jobs:
       attestations: write
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
       - name: Collect artifacts
         run: |
           for DIR in onnxruntime-*; do
@@ -245,9 +245,9 @@ jobs:
           - { ep: openvino, arch: aarch64, libc: glibc, base: debian:trixie-slim, platform: linux/arm64 }
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Download artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: onnxruntime-${{ matrix.ep }}-${{ matrix.libc }}-${{ matrix.arch }}
           path: ./docker-context

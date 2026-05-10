@@ -39,7 +39,7 @@ jobs:
     outputs:
       artifact: ${{ steps.init.outputs.artifact }}
     runs-on: ${{ inputs.target_arch == 'x86_64' && 'ubuntu-24.04' || 'ubuntu-24.04-arm' }}
-    container: ${{ inputs.target_libc == 'glibc' && 'debian:trixie-slim' || 'alpine:latest' }}
+    container: ${{ inputs.target_libc == 'glibc' && 'debian:trixie-slim' || '' }}
     env:
       ONNXRUNTIME_VERSION: ${{ inputs.version }}
       ONNXRUNTIME_EP: ${{ inputs.ep }}
@@ -47,10 +47,6 @@ jobs:
       ONNXRUNTIME_TARGET_LIBC: ${{ inputs.target_libc }}
       ONNXRUNTIME_IS_DEBUG: ${{ inputs.is_debug }}
     steps:
-      - name: Bootstrap container
-        if: inputs.target_libc == 'musl'
-        run: apk add --no-cache bash git
-        shell: sh
       - name: Initialize
         id: init
         shell: bash
@@ -60,33 +56,84 @@ jobs:
           echo "artifact=$ARTIFACT" >> "$GITHUB_OUTPUT"
           echo "ONNXRUNTIME_ARTIFACT_NAME=$ARTIFACT" >> "$GITHUB_ENV"
       - name: Checkout this repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      # --- glibc builds (native in container) ---
       - name: Set environment variables
+        if: inputs.target_libc == 'glibc'
         run: steps/00-environment.sh
         shell: bash
       - name: Install dependencies
+        if: inputs.target_libc == 'glibc'
         run: steps/01-install.sh
         shell: bash
       - name: Install OpenVINO
-        if: inputs.ep == 'openvino'
+        if: inputs.target_libc == 'glibc' && inputs.ep == 'openvino'
         run: steps/03-install-openvino.sh
         shell: bash
       - name: Checkout ONNX Runtime
+        if: inputs.target_libc == 'glibc'
         run: steps/02-checkout.sh
         shell: bash
         timeout-minutes: 15
       - name: Build
+        if: inputs.target_libc == 'glibc'
         run: steps/04-build.sh
         shell: bash
         timeout-minutes: 180
       - name: Stage
+        if: inputs.target_libc == 'glibc'
         run: steps/05-stage.sh
         shell: bash
       - name: Pack
+        if: inputs.target_libc == 'glibc'
         run: steps/06-pack.sh
         shell: bash
+
+      # --- musl builds (Docker-based, avoids JS actions in Alpine) ---
+      - name: Start Alpine builder
+        if: inputs.target_libc == 'musl'
+        run: |
+          docker run -d --name builder \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            -e ONNXRUNTIME_VERSION \
+            -e ONNXRUNTIME_EP \
+            -e ONNXRUNTIME_TARGET_ARCH \
+            -e ONNXRUNTIME_TARGET_LIBC \
+            -e ONNXRUNTIME_IS_DEBUG \
+            -e ONNXRUNTIME_ARTIFACT_NAME \
+            alpine:latest \
+            sleep 3600
+      - name: Bootstrap Alpine builder
+        if: inputs.target_libc == 'musl'
+        run: docker exec builder apk add --no-cache bash git
+      - name: Set environment (musl)
+        if: inputs.target_libc == 'musl'
+        run: docker exec builder bash steps/00-environment.sh
+      - name: Install dependencies (musl)
+        if: inputs.target_libc == 'musl'
+        run: docker exec builder bash steps/01-install.sh
+      - name: Checkout ONNX Runtime (musl)
+        if: inputs.target_libc == 'musl'
+        run: docker exec builder bash steps/02-checkout.sh
+        timeout-minutes: 15
+      - name: Build (musl)
+        if: inputs.target_libc == 'musl'
+        run: docker exec builder bash steps/04-build.sh
+        timeout-minutes: 180
+      - name: Stage (musl)
+        if: inputs.target_libc == 'musl'
+        run: docker exec builder bash steps/05-stage.sh
+      - name: Pack (musl)
+        if: inputs.target_libc == 'musl'
+        run: docker exec builder bash steps/06-pack.sh
+      - name: Cleanup Alpine builder
+        if: inputs.target_libc == 'musl' && always()
+        run: docker stop builder && docker rm builder || true
+
       - name: Upload artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.init.outputs.artifact }}
           path: "*.tgz"
